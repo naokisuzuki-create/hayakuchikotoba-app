@@ -46,10 +46,10 @@
     }
     .screen.active{ display:grid; }
 
-    /* ===== タイトル画面（背景ぼかし＋暗めオーバーレイ） ===== */
+    /* ===== タイトル/終了画面（背景ぼかし＋暗めオーバーレイ） ===== */
     .title-screen{
       width:100%; height:100%; overflow:hidden;
-      /* display:grid;  ← A案：削除 */
+      /* display:grid;  ← A案：削除（activeだけ表示される） */
       /* place-items:center; ← .screen.activeが担当 */
     }
     .title-screen::before{
@@ -124,7 +124,7 @@
       <div id="count" aria-live="polite" style="color:var(--muted);"></div>
     </header>
 
-    <!-- 3画面を1つのラッパで重ねる -->
+    <!-- 3(+1)画面を1つのラッパで重ねる -->
     <div class="screens">
       <!-- タイトル画面 -->
       <section id="titleScreen" class="screen title-screen active">
@@ -164,6 +164,15 @@
           <button id="next" title="次のカード">次へ →</button>
         </footer>
       </main>
+
+      <!-- 終了画面 -->
+      <section id="endScreen" class="screen title-screen">
+        <div class="title-block">
+          <div class="title-main">しゅうりょう～！</div>
+          <div class="title-sub">おつかれさまでした</div>
+          <button id="restartBtn" class="start-btn">もう一度</button>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -202,7 +211,8 @@
 
     // 画面切替
     function show(id){
-      ['titleScreen','countdownScreen','gameScreen'].forEach(x=>document.getElementById(x).classList.remove('active'));
+      ['titleScreen','countdownScreen','gameScreen','endScreen']
+        .forEach(x=>document.getElementById(x).classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
@@ -232,32 +242,46 @@
         el.textContent=n; el.style.animation='none'; void el.offsetWidth; el.style.animation='pulse .8s ease both';
         await wait(900);
       }
-      show('gameScreen');
       if(typeof nextStep === 'function') nextStep();
       isCounting = false;
     }
 
-    // ナビ
+    // ナビ（次へ）
     function goNext(){
       if(isCounting || !order.length) return;
+
+      // 最後の問題の後は終了画面へ
+      if(idx === order.length - 1){
+        startCountdown(()=>{
+          show('endScreen');
+        });
+        return;
+      }
+
+      // 通常進行
       startCountdown(()=>{
-        idx = (idx + 1) % order.length;
+        show('gameScreen');
+        idx = (idx + 1);
         render();
       });
     }
+
+    // ナビ（もどる）※終了には遷移しない
     function goPrev(){
       if(isCounting || !order.length) return;
       startCountdown(()=>{
+        show('gameScreen');
         idx = (idx - 1 + order.length) % order.length;
         render();
       });
     }
+
+    // キー操作
     function onKey(e){
       if(isCounting) return;
-      // ゲーム画面アクティブ時のみ操作
-      if(!document.getElementById('gameScreen').classList.contains('active')) return;
-      if(e.key==='ArrowRight'||e.key==='Enter'||e.key===' '){ goNext(); }
-      if(e.key==='ArrowLeft'){ goPrev(); }
+      const gameActive = document.getElementById('gameScreen').classList.contains('active');
+      if(gameActive && (e.key==='ArrowRight'||e.key==='Enter'||e.key===' ')){ goNext(); }
+      if(gameActive && e.key==='ArrowLeft'){ goPrev(); }
     }
 
     // マニフェスト取得
@@ -297,6 +321,16 @@
     document.getElementById('prev').addEventListener('click', goPrev);
     document.getElementById('card').addEventListener('click', goNext);
     window.addEventListener('keydown', onKey);
+
+    // 再スタート
+    document.getElementById('restartBtn').addEventListener('click', ()=>{
+      order = shuffle([...cards.keys()]);
+      idx = 0;
+      startCountdown(()=>{
+        show('gameScreen');
+        render();
+      });
+    });
 
     // 起動
     boot();
