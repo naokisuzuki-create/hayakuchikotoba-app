@@ -97,10 +97,16 @@
 
     /* ===== ゲーム画面 ===== */
     .card{
-      margin:0 12px 12px; background:var(--card); border-radius:20px;
+      margin:20px auto;  /* 画面中央に寄せつつ上下余白 */
+      background:var(--card); border-radius:20px;
       box-shadow:0 8px 24px rgba(0,0,0,.08);
       display:grid; grid-template-rows:auto auto 1fr auto;
-      min-height:calc(100svh - var(--topbar-h) - 60px);
+
+      /* 高さを一回り縮める */
+      min-height:calc(90svh - var(--topbar-h) - 48px);
+
+      /* 横幅を90%に制限 */
+      max-width:90%;
     }
     .text{padding:8px 16px 0; text-align:center;}
     .reading{margin-bottom:6px; color:var(--muted); font-size:clamp(16px,3.6vw,28px);}
@@ -337,3 +343,4 @@
   </script>
 </body>
 </html>
+
