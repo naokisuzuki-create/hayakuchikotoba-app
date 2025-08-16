@@ -17,14 +17,12 @@
     .screen.active{display:grid;place-items:center;}
 
     /* タイトル画面（背景は必要なら差し替えOK） */
-    .title-screen{
+    .title-screen {
+      padding:24px; 
       text-align:center;
-      padding:24px;
-      background:
-        radial-gradient(1200px 600px at 50% -10%, #ffe6f5 0%, transparent 60%),
-        radial-gradient(900px 500px at 120% 30%, #fff1cc 0%, transparent 60%),
-        radial-gradient(900px 600px at -20% 70%, #e6f7ff 0%, transparent 60%);
+      background: url("images/053.png") center/cover no-repeat;
     }
+
     .title-block{display:grid;gap:10px;justify-items:center;}
     .title-main{font-weight:900;letter-spacing:.02em;font-size:clamp(28px, 6.2vw, 56px);}
     .title-sub{font-weight:800;opacity:.9;font-size:clamp(18px, 3.8vw, 28px);}
@@ -272,3 +270,4 @@
   </script>
 </body>
 </html>
+
