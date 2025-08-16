@@ -7,77 +7,113 @@
   <style>
     :root{
       --bg:#fff8ef; --ink:#1f1e1c; --muted:#6b6a68; --card:#ffffff; --accent:#ff5db1;
-      --topbar-h:56px; /* ヘッダーの高さ（iPadでも収まる値） */
+      --topbar-h:56px; /* ヘッダー高さ */
     }
     html,body{height:100%;}
     body{
-      margin:0;background:var(--bg);color:var(--ink);
+      margin:0; background:var(--bg); color:var(--ink);
       font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;
+      overflow:hidden; /* 画面切替でのページスクロール防止 */
     }
-    .app{min-height:100%;display:grid;grid-template-rows:auto 1fr auto;}
-    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;}
-    .brand{font-weight:800;letter-spacing:.02em;}
 
-    /* 画面切替共通：アドレスバーの有無に強い svh を使用 */
-    .screen{display:none;min-height:calc(100svh - var(--topbar-h));}
-    .screen.active{display:grid;place-items:center;}
+    /* 画面は「ヘッダー(固定) + 本体(重ねた3画面)」の2行構成 */
+    .app{
+      min-height:100svh;
+      display:grid;
+      grid-template-rows: var(--topbar-h) 1fr;
+    }
+    .topbar{
+      height: var(--topbar-h);
+      box-sizing: border-box;
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      padding:12px 16px;
+    }
+    .brand{font-weight:800; letter-spacing:.02em;}
 
-    /* ===== タイトル画面：ぼかし＆暗めオーバーレイで文字を目立たせる ===== */
+    /* 3画面のラッパ：ここに重ねて表示する */
+    .screens{
+      position:relative;
+      height:100%;
+      min-height:0;  /* Safari 対策 */
+      overflow:hidden;
+    }
+
+    /* 画面：重ねておき、active だけ表示 */
+    .screen{
+      position:absolute; inset:0;
+      display:none;       /* 非表示 */
+      place-items:center; /* active時に中央寄せ */
+    }
+    .screen.active{ display:grid; }
+
+    /* ===== タイトル画面（背景ぼかし＋暗めオーバーレイ） ===== */
     .title-screen{
-      position:relative;display:grid;place-items:center;
-      width:100%;height:calc(100svh - var(--topbar-h));overflow:hidden;
+      width:100%; height:100%; overflow:hidden;
+      display:grid; place-items:center;
     }
     .title-screen::before{
-      content:"";position:absolute;inset:-32px; /* 端欠け防止 */
+      content:""; position:absolute; inset:-32px; /* 端欠け防止 */
       background:url("images/053.png") center/cover no-repeat;
-      transform:scale(1.06);filter:blur(10px);z-index:0;pointer-events:none;
+      transform:scale(1.06); filter:blur(10px);
+      z-index:0; pointer-events:none;
     }
     .title-screen::after{
-      content:"";position:absolute;inset:0;background:rgba(0,0,0,.40);
-      z-index:1;pointer-events:none;
+      content:""; position:absolute; inset:0;
+      background:rgba(0,0,0,.40);
+      z-index:1; pointer-events:none;
     }
     .title-block{
-      position:relative;z-index:2;display:grid;gap:10px;justify-items:center;text-align:center;
-      color:#fff;text-shadow:0 4px 12px rgba(0,0,0,.85);padding:0 16px;
+      position:relative; z-index:2;
+      display:grid; gap:10px; justify-items:center; text-align:center;
+      color:#fff; text-shadow:0 4px 12px rgba(0,0,0,.85);
+      padding:0 16px;
     }
-    .title-main{font-weight:900;letter-spacing:.02em;font-size:clamp(32px,7vw,72px);}
-    .title-sub{font-weight:700;opacity:.9;font-size:clamp(18px,3.5vw,32px);}
+    .title-main{font-weight:900; letter-spacing:.02em; font-size:clamp(32px,7vw,72px);}
+    .title-sub {font-weight:700; opacity:.9; font-size:clamp(18px,3.5vw,32px);}
     .start-btn{
-      margin-top:18px;appearance:none;border:0;border-radius:16px;
-      padding:14px 22px;font-size:18px;font-weight:900;cursor:pointer;
-      background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.12);
-    }
-
-    /* タイトル画面だけ、余白なく全画面中央寄せ */
-    .title-screen.active {
-      height:100svh;
-      min-height:100svh;
-      grid-template-rows: 1fr; /* 余計な行分割をなくす */
+      margin-top:18px; appearance:none; border:0; border-radius:16px;
+      padding:14px 22px; font-size:18px; font-weight:900; cursor:pointer;
+      background:var(--accent); color:#fff; box-shadow:0 8px 18px rgba(0,0,0,.12);
     }
 
     /* ===== カウントダウン画面 ===== */
-    .countdown-wrap{display:grid;place-items:center;inline-size:100%;block-size:100%;background:rgba(0,0,0,.35);}
-    .count{font-weight:900;color:#fff;font-size:clamp(48px,12vw,120px);text-shadow:0 8px 28px rgba(0,0,0,.55);animation:pulse .8s ease both;}
-    @keyframes pulse{0%{transform:scale(.6);opacity:.6}70%{transform:scale(1.05);opacity:1}100%{transform:scale(1);opacity:1}}
+    .countdown-wrap{
+      display:grid; place-items:center;
+      inline-size:100%; block-size:100%;
+      background:rgba(0,0,0,.35);
+    }
+    .count{
+      font-weight:900; color:#fff;
+      font-size:clamp(48px,12vw,120px);
+      text-shadow:0 8px 28px rgba(0,0,0,.55);
+      animation:pulse .8s ease both;
+    }
+    @keyframes pulse{
+      0%{transform:scale(.6);opacity:.6}
+      70%{transform:scale(1.05);opacity:1}
+      100%{transform:scale(1);opacity:1}
+    }
 
     /* ===== ゲーム画面 ===== */
     .card{
-      margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);
-      display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100svh - var(--topbar-h) - 60px);
+      margin:0 12px 12px; background:var(--card); border-radius:20px;
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      display:grid; grid-template-rows:auto auto 1fr auto;
+      min-height:calc(100svh - var(--topbar-h) - 60px);
     }
-    .text{padding:8px 16px 0;text-align:center;}
-    .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px,3.6vw,28px);}
-    .title{font-weight:800;line-height:1.25;font-size:clamp(20px,4.2vw,40px);}
-    .stage{display:grid;place-items:center;padding:8px 8px 0;}
-    .imgwrap{width:100%;height:100%;display:grid;place-items:center;padding:8px;}
-    img.art{max-width:100%;max-height:60vh;object-fit:contain;border-radius:16px;}
-    .meta{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 16px;}
+    .text{padding:8px 16px 0; text-align:center;}
+    .reading{margin-bottom:6px; color:var(--muted); font-size:clamp(16px,3.6vw,28px);}
+    .title{font-weight:800; line-height:1.25; font-size:clamp(20px,4.2vw,40px);}
+    .stage{display:grid; place-items:center; padding:8px 8px 0;}
+    .imgwrap{width:100%; height:100%; display:grid; place-items:center; padding:8px;}
+    img.art{max-width:100%; max-height:60vh; object-fit:contain; border-radius:16px;}
+    .meta{display:flex; align-items:center; justify-content:space-between; padding:12px 16px 16px;}
     .stars{font-size:clamp(18px,4vw,32px);}
-    .controls{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 16px 20px;}
-    button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:#1f1e1c;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);}
-    button.secondary{background:#e9e7e2;color:#222;}
-    .tap{color:var(--muted);font-size:14px;text-align:center;margin-top:-6px;margin-bottom:6px;}
-    .err{color:#c00;font-size:14px;margin-top:8px;white-space:pre-wrap}
+    .controls{display:flex; gap:10px; align-items:center; justify-content:center; padding:12px 16px 20px;}
+    button{appearance:none; border:0; border-radius:14px; padding:14px 18px; font-size:18px; font-weight:700; cursor:pointer; background:#1f1e1c; color:#fff; box-shadow:0 6px 16px rgba(0,0,0,.15);}
+    button.secondary{background:#e9e7e2; color:#222;}
+    .tap{color:var(--muted); font-size:14px; text-align:center; margin-top:-6px; margin-bottom:6px;}
+    .err{color:#c00; font-size:14px; margin-top:8px; white-space:pre-wrap}
   </style>
 </head>
 <body>
@@ -87,44 +123,47 @@
       <div id="count" aria-live="polite" style="color:var(--muted);"></div>
     </header>
 
-    <!-- タイトル画面 -->
-    <section id="titleScreen" class="screen title-screen active">
-      <div class="title-block">
-        <div class="title-main">カミカミ★パラダイス</div>
-        <div class="title-sub">舌こんがらがり選手権</div>
-        <button id="startBtn" class="start-btn" title="はじめる">はじめる</button>
-      </div>
-    </section>
-
-    <!-- カウントダウン画面 -->
-    <section id="countdownScreen" class="screen" aria-live="polite">
-      <div class="countdown-wrap"><div id="countNum" class="count">3</div></div>
-    </section>
-
-    <!-- ゲーム画面 -->
-    <main id="gameScreen" class="screen">
-      <section class="card" id="card" title="画面タップでも次へ進めます">
-        <div class="text">
-          <div class="reading" id="reading"></div>
-          <div class="title" id="title">読み込み中…</div>
-          <div class="err" id="err"></div>
-        </div>
-        <div class="stage">
-          <div class="imgwrap">
-            <img class="art" id="art" alt="イラスト" decoding="async" />
-          </div>
-        </div>
-        <div class="meta">
-          <div class="stars" id="stars" aria-label="難易度"></div>
-          <div class="tap">（タップでも次へ）</div>
+    <!-- 3画面を1つのラッパで重ねる -->
+    <div class="screens">
+      <!-- タイトル画面 -->
+      <section id="titleScreen" class="screen title-screen active">
+        <div class="title-block">
+          <div class="title-main">カミカミ★パラダイス</div>
+          <div class="title-sub">舌こんがらがり選手権</div>
+          <button id="startBtn" class="start-btn" title="はじめる">はじめる</button>
         </div>
       </section>
 
-      <footer class="controls">
-        <button id="prev" class="secondary" title="ひとつ前">← もどる</button>
-        <button id="next" title="次のカード">次へ →</button>
-      </footer>
-    </main>
+      <!-- カウントダウン画面 -->
+      <section id="countdownScreen" class="screen" aria-live="polite">
+        <div class="countdown-wrap"><div id="countNum" class="count">3</div></div>
+      </section>
+
+      <!-- ゲーム画面 -->
+      <main id="gameScreen" class="screen">
+        <section class="card" id="card" title="画面タップでも次へ進めます">
+          <div class="text">
+            <div class="reading" id="reading"></div>
+            <div class="title" id="title">読み込み中…</div>
+            <div class="err" id="err"></div>
+          </div>
+          <div class="stage">
+            <div class="imgwrap">
+              <img class="art" id="art" alt="イラスト" decoding="async" />
+            </div>
+          </div>
+          <div class="meta">
+            <div class="stars" id="stars" aria-label="難易度"></div>
+            <div class="tap">（タップでも次へ）</div>
+          </div>
+        </section>
+
+        <footer class="controls">
+          <button id="prev" class="secondary" title="ひとつ前">← もどる</button>
+          <button id="next" title="次のカード">次へ →</button>
+        </footer>
+      </main>
+    </div>
   </div>
 
   <script>
@@ -238,4 +277,3 @@
   </script>
 </body>
 </html>
-
