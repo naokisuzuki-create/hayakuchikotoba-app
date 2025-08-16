@@ -13,28 +13,19 @@
     .app{min-height:100%;display:grid;grid-template-rows:auto 1fr auto;}
     .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;}
     .brand{font-weight:800;letter-spacing:.02em;}
-
-    .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto 1fr auto;min-height:calc(100vh - 120px);}    
-
-    /* ==== テキストを上、読み(ひらがな)を一番上に ==== */
-    .text{padding:16px 16px 0;}
-    .reading{order:-1;margin:0 0 6px 0;color:var(--muted);font-size:clamp(18px, 3.8vw, 30px);}
-    .title{font-weight:900;line-height:1.22;font-size:clamp(22px, 4.6vw, 44px);}  
-
+    .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100vh - 120px);}    
+    .text{padding:8px 16px 0;text-align:center;}
+    .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px);}
+    .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px, 3.6vw, 28px);}
     .stage{display:grid;place-items:center;padding:8px 8px 0;}
     .imgwrap{width:100%;height:100%;display:grid;place-items:center;padding:8px;}
-    img.art{max-width:100%;max-height:60vh;object-fit:contain;border-radius:16px;background:#f2eee8;}
-
-    .meta{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 16px;}
-    .stars{font-size:clamp(18px, 4vw, 32px);} 
-    .tap{color:var(--muted);font-size:14px;text-align:center;margin-top:-6px;margin-bottom:6px;}
-
+    img.art{max-width:100%;max-height:60vh;object-fit:contain;border-radius:16px;}
+    .meta{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 16px;}
+    .stars{font-size:clamp(18px, 4vw, 32px);}
     .controls{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 16px 20px;}
     button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);} 
     button.secondary{background:#e9e7e2;color:#222;}
-
-    /* ローディング中でもテキストは即表示される設計 */
-    .loading-hint{visibility:visible;color:var(--muted);font-size:14px;text-align:center}
+    .tap{color:var(--muted);font-size:14px;text-align:center;margin-top:-6px;margin-bottom:6px;}
   </style>
 </head>
 <body>
@@ -44,21 +35,16 @@
       <div id="count" aria-live="polite" style="color:var(--muted);"></div>
     </header>
 
-    <main class="card" id="card" title="画面タップでも次へ進めます">
-      <!-- テキストを最上段に配置（読み → 漢字） -->
+    <main class="card" id="card">
       <div class="text">
         <div class="reading" id="reading"></div>
         <div class="title" id="title">読み込み中…</div>
       </div>
-
-      <!-- イメージを下段に配置（テキストと同時に表示開始） -->
-      <div class="stage" id="stage">
+      <div class="stage" id="stage" title="画面タップでも次へ進めます">
         <div class="imgwrap">
-          <img class="art" id="art" alt="イラスト" decoding="async" loading="eager" />
+          <img class="art" id="art" alt="イラスト" decoding="async" />
         </div>
-        <div class="loading-hint" id="loadingHint"></div>
       </div>
-
       <div class="meta">
         <div class="stars" id="stars" aria-label="難易度"></div>
         <div class="tap">（タップでも次へ）</div>
@@ -72,14 +58,12 @@
   </div>
 
   <script>
-    // ===== 設定 =====
-    const DATA_URL = "data/hayakuchikotoba_manifest.json"; // マニフェスト
-    const IMG_BASE = "images/"; // 画像フォルダ
+    const DATA_URL = "data/hayakuchikotoba_manifest.json";
+    const IMG_BASE = "images/";
 
-    // ===== 状態 =====
-    let cards = []; // {filename, reading, difficulty}
-    let order = []; // インデックスのシャッフル順
-    let idx = 0;    // 現在位置
+    let cards = [];
+    let order = [];
+    let idx = 0;
 
     function shuffle(arr){
       const a = arr.slice();
@@ -89,55 +73,38 @@
       }
       return a;
     }
-    function stripExt(name){ return name.replace(/\.[^.]+$/, ""); }
-
-    // 先読みで次の画像をキャッシュ
-    function preloadNext(){
-      if(!cards.length) return;
-      const nextI = order[(idx + 1) % order.length];
-      const nextItem = cards[nextI];
-      if(nextItem){
-        const img = new Image();
-        img.decoding = 'async';
-        img.loading = 'eager';
-        img.src = encodeURI(IMG_BASE + nextItem.filename);
-      }
+    function stripExt(name){
+      return name.replace(/\.[^.]+$/, "");
     }
-
     function render(){
       if(!cards.length) return;
       const i = order[idx];
       const item = cards[i];
       const title = stripExt(item.filename);
 
-      // まずテキストを即表示（画像の読み込み待ちをしない）
-      const titleEl = document.getElementById('title');
-      const readingEl = document.getElementById('reading');
-      const starsEl = document.getElementById('stars');
-      const countEl = document.getElementById('count');
-      const hintEl = document.getElementById('loadingHint');
+      document.getElementById('reading').textContent = item.reading || '';
+      document.getElementById('title').textContent = title;
+      document.getElementById('stars').textContent = item.difficulty || '';
+      document.getElementById('count').textContent = `${idx+1} / ${cards.length}`;
 
-      titleEl.textContent = title;                 // 漢字・カタカナタイトル
-      readingEl.textContent = item.reading || '';  // ひらがな（上段）
-      starsEl.textContent = item.difficulty || '';
-      countEl.textContent = `${idx+1} / ${cards.length}`;
-
-      // 次に画像を読み込む（読み込み中はヒント表示）
       const art = document.getElementById('art');
-      hintEl.textContent = '画像を読み込み中…';
-      art.onload = () => { hintEl.textContent = ''; };
-      art.onerror = () => { hintEl.textContent = '画像が見つかりません'; };
-      art.src = encodeURI(IMG_BASE + item.filename);
+      const src = IMG_BASE + item.filename;
+      art.src = encodeURI(src);
       art.alt = title;
 
-      // 次の画像を先読み
-      preloadNext();
+      const nextIdx = (idx + 1) % order.length;
+      const nextItem = cards[order[nextIdx]];
+      if(nextItem){
+        const preload = new Image();
+        preload.src = IMG_BASE + nextItem.filename;
+      }
     }
-
-    function next(){ if(!cards.length) return; idx = (idx + 1) % order.length; render(); }
-    function prev(){ if(!cards.length) return; idx = (idx - 1 + order.length) % order.length; render(); }
-    function onKey(e){ if(e.key==='ArrowRight'||e.key==='Enter'||e.key===' '){next();} if(e.key==='ArrowLeft'){prev();} }
-
+    function next(){ idx = (idx + 1) % order.length; render(); }
+    function prev(){ idx = (idx - 1 + order.length) % order.length; render(); }
+    function onKey(e){
+      if(e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' '){ next(); }
+      if(e.key === 'ArrowLeft'){ prev(); }
+    }
     async function boot(){
       try{
         const res = await fetch(DATA_URL, {cache:'no-store'});
