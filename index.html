@@ -49,7 +49,8 @@
     /* ===== タイトル画面（背景ぼかし＋暗めオーバーレイ） ===== */
     .title-screen{
       width:100%; height:100%; overflow:hidden;
-      display:grid; place-items:center;
+      /* display:grid;  ← A案：削除 */
+      /* place-items:center; ← .screen.activeが担当 */
     }
     .title-screen::before{
       content:""; position:absolute; inset:-32px; /* 端欠け防止 */
@@ -188,6 +189,7 @@
     let cards = [];    // { id, title, reading, difficulty }
     let order = [];    // シャッフル済みインデックス
     let idx = 0;
+    let isCounting = false; // カウントダウン中フラグ
 
     // Util
     const wait = (ms)=>new Promise(r=>setTimeout(r,ms));
@@ -220,13 +222,42 @@
       if(nextItem){ const pre = new Image(); pre.src = encodeURI(IMG_BASE + nextItem.id + ".png"); }
     }
 
+    // カウントダウン
+    async function startCountdown(nextStep){
+      if(isCounting) return; // 二重起動防止
+      isCounting = true;
+      show('countdownScreen');
+      for(const n of ['3','2','1']){
+        const el=document.getElementById('countNum');
+        el.textContent=n; el.style.animation='none'; void el.offsetWidth; el.style.animation='pulse .8s ease both';
+        await wait(900);
+      }
+      show('gameScreen');
+      if(typeof nextStep === 'function') nextStep();
+      isCounting = false;
+    }
+
     // ナビ
-    function next(){ idx = (idx + 1) % order.length; render(); }
-    function prev(){ idx = (idx - 1 + order.length) % order.length; render(); }
+    function goNext(){
+      if(isCounting || !order.length) return;
+      startCountdown(()=>{
+        idx = (idx + 1) % order.length;
+        render();
+      });
+    }
+    function goPrev(){
+      if(isCounting || !order.length) return;
+      startCountdown(()=>{
+        idx = (idx - 1 + order.length) % order.length;
+        render();
+      });
+    }
     function onKey(e){
+      if(isCounting) return;
+      // ゲーム画面アクティブ時のみ操作
       if(!document.getElementById('gameScreen').classList.contains('active')) return;
-      if(e.key==='ArrowRight'||e.key==='Enter'||e.key===' '){ next(); }
-      if(e.key==='ArrowLeft'){ prev(); }
+      if(e.key==='ArrowRight'||e.key==='Enter'||e.key===' '){ goNext(); }
+      if(e.key==='ArrowLeft'){ goPrev(); }
     }
 
     // マニフェスト取得
@@ -245,31 +276,26 @@
 
     async function boot(){
       const result=await fetchFirstOk(DATA_CANDIDATES);
-      if(!result.ok){ setError('マニフェストを読み込めませんでした'); errEl.textContent='試したURL:\\n'+result.errors.join('\\n'); return; }
+      if(!result.ok){ setError('マニフェストを読み込めませんでした'); errEl.textContent='試したURL:\n'+result.errors.join('\n'); return; }
       try{
         const raw=Array.isArray(result.json)?result.json:[];
         cards=raw.filter(r=>r&&r.id);
         if(!cards.length){ setError('カードがありません（JSONが空の可能性）'); errEl.textContent=`読み込んだURL: ${result.url}`; return; }
         order=shuffle([...cards.keys()]); idx=0; errEl.textContent='';
-      }catch(e){ setError('JSONの解析に失敗しました'); errEl.textContent=`URL: ${result.url}\\nError: ${e.message}`; }
-    }
-
-    // カウントダウン
-    async function startCountdown(){
-      show('countdownScreen');
-      for(const n of ['3','2','1']){
-        const el=document.getElementById('countNum');
-        el.textContent=n; el.style.animation='none'; void el.offsetWidth; el.style.animation='pulse .8s ease both';
-        await wait(900);
-      }
-      show('gameScreen'); render();
+      }catch(e){ setError('JSONの解析に失敗しました'); errEl.textContent=`URL: ${result.url}\nError: ${e.message}`; }
     }
 
     // イベント
-    document.getElementById('startBtn').addEventListener('click', startCountdown);
-    document.getElementById('next').addEventListener('click', next);
-    document.getElementById('prev').addEventListener('click', prev);
-    document.getElementById('card').addEventListener('click', next);
+    document.getElementById('startBtn').addEventListener('click', ()=>{
+      // 最初の開始：タイトル→カウントダウン→ゲーム1枚目描画
+      startCountdown(()=>{
+        show('gameScreen');
+        render();
+      });
+    });
+    document.getElementById('next').addEventListener('click', goNext);
+    document.getElementById('prev').addEventListener('click', goPrev);
+    document.getElementById('card').addEventListener('click', goNext);
     window.addEventListener('keydown', onKey);
 
     // 起動
