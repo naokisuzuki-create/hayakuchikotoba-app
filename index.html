@@ -17,20 +17,66 @@
     .screen.active{display:grid;place-items:center;}
 
     /* タイトル画面（背景は必要なら差し替えOK） */
-    .title-screen {
-      padding:24px; 
-      text-align:center;
-      background: url("images/053.png") center/cover no-repeat;
-    }
+    /* タイトル画面（背景画像をぼかして暗く） */
+.title-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
 
-    .title-block{display:grid;gap:10px;justify-items:center;}
-    .title-main{font-weight:900;letter-spacing:.02em;font-size:clamp(28px, 6.2vw, 56px);}
-    .title-sub{font-weight:800;opacity:.9;font-size:clamp(18px, 3.8vw, 28px);}
-    .start-btn{
-      margin-top:18px;appearance:none;border:0;border-radius:16px;
-      padding:14px 22px;font-size:18px;font-weight:900;cursor:pointer;
-      background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.12);
-    }
+/* 擬似要素で背景処理 */
+.title-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("images/053.png") center/cover no-repeat;
+  filter: blur(6px) brightness(0.55);
+  z-index: 0;
+}
+
+/* タイトル文字を中央に配置 */
+.title-block {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 4px 12px rgba(0,0,0,0.85);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.title-main {
+  font-weight: 900;
+  letter-spacing: .02em;
+  font-size: clamp(32px, 7vw, 72px);
+}
+
+.title-sub {
+  font-weight: 700;
+  opacity: .9;
+  font-size: clamp(18px, 3.5vw, 32px);
+}
+
+/* ボタンはそのまま */
+.start-btn {
+  margin-top: 18px;
+  appearance: none;
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 22px;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.12);
+}
+
 
     /* カウントダウン画面 */
     .countdown-wrap{
@@ -270,4 +316,5 @@
   </script>
 </body>
 </html>
+
 
