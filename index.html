@@ -14,12 +14,9 @@
     .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;}
     .brand{font-weight:800;letter-spacing:.02em;}
     .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100vh - 120px);}    
-    .text{padding:8px 16px 0;text-align:center;}
-    .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px);}
+    .text{padding:8px 16px 0; text-align:center;}
+    .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px); margin:0 auto;}
     .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px, 3.6vw, 28px);}
-    .text{padding:8px 16px 0; text-align:center !important;}
-    .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px); text-align:center !important; margin:0 auto;}
-    .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px, 3.6vw, 28px); text-align:center !important; margin-left:auto; margin-right:auto;}
     .stage{display:grid;place-items:center;padding:8px 8px 0;}
     .imgwrap{width:100%;height:100%;display:grid;place-items:center;padding:8px;}
     img.art{max-width:100%;max-height:60vh;object-fit:contain;border-radius:16px;}
@@ -61,12 +58,55 @@
   </div>
 
   <script>
+    // ===== 設定 =====
     const DATA_URL = "data/hayakuchikotoba_manifest.json";
     const IMG_BASE = "images/";
 
+    // ===== 要素参照 =====
+    const readingEl = document.getElementById('reading');
+    const titleEl   = document.getElementById('title');
+    const starsEl   = document.getElementById('stars');
+    const countEl   = document.getElementById('count');
+    const artEl     = document.getElementById('art');
+
+    // ===== ユーティリティ（ゆれ吸収）=====
+    function normalizeFilename(raw){
+      // 1) 文字列化→NFC正規化
+      let s = String(raw ?? '').normalize('NFC');
+      // 2) バックスラッシュ→スラッシュ
+      s = s.replace(/\\/g,'/');
+      // 3) 前後trim
+      s = s.trim();
+      // 4) 連続スペースを1つに
+      s = s.replace(/\s{2,}/g, ' ');
+      // 5) 拡張子直前の空白を除去
+      s = s.replace(/\s+(\.[^.]+)$/, '$1');
+      return s;
+    }
+    function encodePathPerSegment(p){
+      return p.split('/').map(seg => encodeURIComponent(seg)).join('/');
+    }
+    function buildUrl(filename){
+      const cleaned = normalizeFilename(filename);
+      return IMG_BASE + encodePathPerSegment(cleaned);
+    }
+
+    // 画像ロード（成功/失敗判定）
+    function loadImage(url){
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve({ ok:true, url });
+        img.onerror = () => resolve({ ok:false, url });
+        // 軽いキャッシュバスターで古い404を回避
+        img.src = url + (url.includes('?') ? '&' : '?') + 'v=1';
+      });
+    }
+
+    // ===== データ・状態 =====
     let cards = [];
     let order = [];
     let idx = 0;
+    let rendering = false; // 二重遷移防止
 
     function shuffle(arr){
       const a = arr.slice();
@@ -76,51 +116,77 @@
       }
       return a;
     }
-    function stripExt(name){
-      return name.replace(/\.[^.]+$/, "");
-    }
-    function render(){
-      if(!cards.length) return;
+    function stripExt(name){ return String(name).replace(/\.[^.]+$/,""); }
+
+    // ===== 同期表示レンダリング =====
+    async function render(){
+      if(!cards.length || rendering) return;
+      rendering = true;
+
       const i = order[idx];
       const item = cards[i];
-      const title = stripExt(item.filename);
 
-      document.getElementById('reading').textContent = item.reading || '';
-      document.getElementById('title').textContent = title;
-      document.getElementById('stars').textContent = item.difficulty || '';
-      document.getElementById('count').textContent = `${idx+1} / ${cards.length}`;
+      // 事前にURLを決定してロードを試行
+      const titleText = stripExt(item.filename || '');
+      const url = buildUrl(item.filename);
+      const result = await loadImage(url);
 
-      const art = document.getElementById('art');
-      const src = IMG_BASE + item.filename;
-      art.src = encodeURI(src);
-      art.alt = title;
+      // 画像の成否が確定したタイミングで、テキスト＆画像を同時更新
+      readingEl.textContent = item.reading || '';
+      titleEl.textContent   = titleText;
+      starsEl.textContent   = item.difficulty || '';
+      countEl.textContent   = `${idx+1} / ${cards.length}`;
+      artEl.alt             = titleText;
 
+      if(result.ok){
+        artEl.src = result.url;  // 正常表示
+      }else{
+        // プレースホルダ扱い：srcを空にしてメッセージ
+        artEl.removeAttribute('src');
+        console.warn('画像の読み込みに失敗:', { requested: result.url, raw: item.filename });
+        // 失敗時も文字は出す（ユーザー要望は「同時に出す」＝ズレないこと）
+      }
+
+      // 次画像をプリロード（同じURL生成規則で）
       const nextIdx = (idx + 1) % order.length;
       const nextItem = cards[order[nextIdx]];
       if(nextItem){
         const preload = new Image();
-        preload.src = IMG_BASE + nextItem.filename;
+        preload.src = buildUrl(nextItem.filename);
       }
+
+      rendering = false;
     }
-    function next(){ idx = (idx + 1) % order.length; render(); }
-    function prev(){ idx = (idx - 1 + order.length) % order.length; render(); }
+
+    function next(){
+      if(rendering) return; // レンダ中連打でズレないように
+      idx = (idx + 1) % order.length;
+      render();
+    }
+    function prev(){
+      if(rendering) return;
+      idx = (idx - 1 + order.length) % order.length;
+      render();
+    }
     function onKey(e){
       if(e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' '){ next(); }
       if(e.key === 'ArrowLeft'){ prev(); }
     }
+
     async function boot(){
       try{
-        const res = await fetch(DATA_URL, {cache:'no-store'});
+        const res = await fetch(DATA_URL, { cache:'no-store' });
         if(!res.ok) throw new Error('マニフェストを読み込めませんでした');
         const raw = await res.json();
-        cards = raw.filter(r => r.filename && typeof r.filename === 'string');
+        // filenameがstringのものだけ
+        cards = raw.filter(r => r && typeof r.filename === 'string');
         if(!cards.length) throw new Error('カードがありません');
         order = shuffle([...cards.keys()]);
         idx = 0;
         render();
       }catch(err){
-        document.getElementById('title').textContent = '読み込みエラー';
-        document.getElementById('reading').textContent = err.message;
+        titleEl.textContent = '読み込みエラー';
+        readingEl.textContent = err.message || 'エラー';
       }
     }
 
