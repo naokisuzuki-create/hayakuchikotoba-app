@@ -58,13 +58,75 @@
   </div>
 
   <script>
+    // ===== 設定 =====
     const DATA_URL = "data/hayakuchikotoba_manifest.json";
     const IMG_BASE = "images/";
 
-    let cards = [];
-    let order = [];
-    let idx = 0;
+    // ===== 文字種ゆれ等の吸収ヘルパー =====
+    const toKatakana = s => s.replace(/[\u3041-\u3096]/g, ch => String.fromCharCode(ch.charCodeAt(0)+0x60));
+    const toHiragana = s => s.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0x60));
+    function z2h(s){
+      return s
+        .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // 英数記号
+        .replace(/\u3000/g, ' '); // 全角スペース
+    }
+    const segEnc = p => p.split('/').map(x => encodeURIComponent(x)).join('/');
 
+    // filename→試行URL候補を生成（重複は除去）
+    function candidates(raw){
+      const base = String(raw ?? '').normalize('NFC').replace(/\\/g,'/');
+      const list = new Set();
+
+      const add = s => { if (s) list.add(segEnc(s)); };
+
+      // 基本クリーニング
+      let s = base.trim()
+        .replace(/\s+(\.[^.]+)$/, '$1') // 拡張子直前の空白除去
+        .replace(/\s{2,}/g, ' ');       // 連続スペース潰し
+      add(s);
+      add(z2h(s));                      // 全角→半角
+      add(toKatakana(s));               // ひら→カナ
+      add(toHiragana(s));               // カナ→ひら
+      add(z2h(toKatakana(s)));          // 合わせ技
+      add(z2h(toHiragana(s)));
+      add(s.replace(/^\s+|\s+$/g,''));  // 念のため再trim
+
+      return Array.from(list).map(v => IMG_BASE + v);
+    }
+
+    // 成功した解決結果をキャッシュ
+    const resolveCache = new Map(); // key: original filename, val: resolved URL
+
+    // フォールバック付きローダ
+    function loadWithFallback(imgEl, filename){
+      const urls = resolveCache.get(filename) ? [resolveCache.get(filename)] : candidates(filename);
+      const tried = [];
+      return new Promise((resolve) => {
+        const tryNext = (i=0) => {
+          if(i >= urls.length){
+            console.warn('画像解決失敗', { filename, tried });
+            imgEl.removeAttribute('src');
+            resolve(false);
+            return;
+          }
+          const url = urls[i];
+          tried.push(url);
+          const tester = new Image();
+          tester.onload = () => {
+            resolveCache.set(filename, url);
+            imgEl.src = url;
+            resolve(true);
+          };
+          tester.onerror = () => tryNext(i+1);
+          // 軽いキャッシュバスター（CDN/Pagesの残骸対策）
+          tester.src = url + (url.includes('?') ? '&' : '?') + 'v=1';
+        };
+        tryNext();
+      });
+    }
+
+    // ===== 元のロジック =====
+    function stripExt(name){ return String(name).replace(/\.[^.]+$/, ""); }
     function shuffle(arr){
       const a = arr.slice();
       for(let i=a.length-1;i>0;i--){
@@ -73,38 +135,49 @@
       }
       return a;
     }
-    function stripExt(name){
-      return name.replace(/\.[^.]+$/, "");
-    }
-    function render(){
+
+    let cards = [];
+    let order = [];
+    let idx = 0;
+
+    // 既存要素
+    const reading = document.getElementById('reading');
+    const titleEl = document.getElementById('title');
+    const stars = document.getElementById('stars');
+    const count = document.getElementById('count');
+    const art = document.getElementById('art');
+
+    async function render(){
       if(!cards.length) return;
       const i = order[idx];
       const item = cards[i];
-      const title = stripExt(item.filename);
+      const title = stripExt(item.filename || '');
 
-      document.getElementById('reading').textContent = item.reading || '';
-      document.getElementById('title').textContent = title;
-      document.getElementById('stars').textContent = item.difficulty || '';
-      document.getElementById('count').textContent = `${idx+1} / ${cards.length}`;
+      reading.textContent = item.reading || '';
+      titleEl.textContent = title;
+      stars.textContent = item.difficulty || '';
+      count.textContent = `${idx+1} / ${cards.length}`;
 
-      const art = document.getElementById('art');
-      const src = IMG_BASE + item.filename;
-      art.src = encodeURI(src);
-      art.alt = title;
+      // 本画像（フォールバック付き）
+      await loadWithFallback(art, item.filename);
 
+      // 次の画像をプリロード（同じ解決ロジックを尊重）
       const nextIdx = (idx + 1) % order.length;
       const nextItem = cards[order[nextIdx]];
       if(nextItem){
         const preload = new Image();
-        preload.src = IMG_BASE + nextItem.filename;
+        const resolved = resolveCache.get(nextItem.filename);
+        preload.src = resolved || (candidates(nextItem.filename)[0] ?? '');
       }
     }
+
     function next(){ idx = (idx + 1) % order.length; render(); }
     function prev(){ idx = (idx - 1 + order.length) % order.length; render(); }
     function onKey(e){
       if(e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' '){ next(); }
       if(e.key === 'ArrowLeft'){ prev(); }
     }
+
     async function boot(){
       try{
         const res = await fetch(DATA_URL, {cache:'no-store'});
@@ -116,8 +189,8 @@
         idx = 0;
         render();
       }catch(err){
-        document.getElementById('title').textContent = '読み込みエラー';
-        document.getElementById('reading').textContent = err.message;
+        titleEl.textContent = '読み込みエラー';
+        reading.textContent = err.message;
       }
     }
 
