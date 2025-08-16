@@ -3,17 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>早口言葉アプリ（番号統一版）</title>
+  <title>早口言葉アプリ（番号対応版）</title>
   <style>
-    :root{
-      --bg:#fff8ef; --ink:#1f1e1c; --muted:#6b6a68; --card:#ffffff; --accent:#4f8cff;
-    }
+    :root{ --bg:#fff8ef; --ink:#1f1e1c; --muted:#6b6a68; --card:#ffffff; --accent:#4f8cff; }
     html,body{height:100%;}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;}
     .app{min-height:100%;display:grid;grid-template-rows:auto 1fr auto;}
     .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;}
     .brand{font-weight:800;letter-spacing:.02em;}
-    .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100vh - 120px);}    
+    .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100vh - 120px);}
     .text{padding:8px 16px 0;text-align:center;}
     .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px);}
     .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px, 3.6vw, 28px);}
@@ -23,15 +21,16 @@
     .meta{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 16px;}
     .stars{font-size:clamp(18px, 4vw, 32px);}
     .controls{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 16px 20px;}
-    button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);} 
+    button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);}
     button.secondary{background:#e9e7e2;color:#222;}
     .tap{color:var(--muted);font-size:14px;text-align:center;margin-top:-6px;margin-bottom:6px;}
+    .err{color:#c00;font-size:14px;margin-top:8px;white-space:pre-wrap}
   </style>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand">早口言葉アプリ（番号統一版）</div>
+      <div class="brand">早口言葉アプリ（番号対応版）</div>
       <div id="count" aria-live="polite" style="color:var(--muted);"></div>
     </header>
 
@@ -39,6 +38,7 @@
       <div class="text">
         <div class="reading" id="reading"></div>
         <div class="title" id="title">読み込み中…</div>
+        <div class="err" id="err"></div>
       </div>
       <div class="stage" id="stage" title="画面タップでも次へ進めます">
         <div class="imgwrap">
@@ -58,8 +58,23 @@
   </div>
 
   <script>
-    const DATA_URL = "data/hayakuchikotoba_manifest.json"; // ← ファイル名を統一
+    // 最優先の想定パス
+    const PRIMARY_DATA = "data/hayakuchikotoba_manifest.json";
     const IMG_BASE = "images/";
+
+    // 代替候補（プロジェクト直下に置いた場合など）
+    const DATA_CANDIDATES = [
+      PRIMARY_DATA,
+      "./hayakuchikotoba_manifest.json",
+      "./data/hayakuchikotoba_manifest.json",
+    ];
+
+    const readingEl = document.getElementById('reading');
+    const titleEl   = document.getElementById('title');
+    const starsEl   = document.getElementById('stars');
+    const countEl   = document.getElementById('count');
+    const artEl     = document.getElementById('art');
+    const errEl     = document.getElementById('err');
 
     let cards = [];
     let order = [];
@@ -74,24 +89,27 @@
       return a;
     }
 
+    function setError(msg){
+      titleEl.textContent = '読み込みエラー';
+      readingEl.textContent = msg || '';
+    }
+
     function render(){
       if(!cards.length) return;
-      const i = order[idx];
-      const item = cards[i];
+      const item = cards[order[idx]];
 
-      document.getElementById('reading').textContent = item.reading || '';
-      document.getElementById('title').textContent = item.title || '';
-      document.getElementById('stars').textContent = item.difficulty || '';
-      document.getElementById('count').textContent = `${idx+1} / ${cards.length}`;
+      // 文字と画像を同じタイミングで更新
+      readingEl.textContent = item.reading || '';
+      titleEl.textContent   = item.title || '';
+      starsEl.textContent   = item.difficulty || '';
+      countEl.textContent   = `${idx+1} / ${cards.length}`;
 
-      const art = document.getElementById('art');
-      const src = IMG_BASE + item.id + ".png"; // ← idで統一
-      art.src = src;
-      art.alt = item.title || "イラスト";
+      const src = IMG_BASE + item.id + ".png";
+      artEl.alt = item.title || "イラスト";
+      artEl.src = src;
 
       // 次の画像を先読み
-      const nextIdx = (idx + 1) % order.length;
-      const nextItem = cards[order[nextIdx]];
+      const nextItem = cards[order[(idx + 1) % order.length]];
       if(nextItem){
         const preload = new Image();
         preload.src = IMG_BASE + nextItem.id + ".png";
@@ -105,19 +123,49 @@
       if(e.key === 'ArrowLeft'){ prev(); }
     }
 
+    async function fetchFirstOk(urls){
+      const errors = [];
+      for(const u of urls){
+        const url = u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now();
+        try{
+          const res = await fetch(url, {cache:'no-store'});
+          if(res.ok){
+            const json = await res.json();
+            return { ok:true, json, url:u, status:res.status };
+          }else{
+            errors.push(`${u} → HTTP ${res.status}`);
+          }
+        }catch(e){
+          errors.push(`${u} → ${e.message}`);
+        }
+      }
+      return { ok:false, errors };
+    }
+
     async function boot(){
+      const result = await fetchFirstOk(DATA_CANDIDATES);
+      if(!result.ok){
+        setError('マニフェストを読み込めませんでした');
+        errEl.textContent = '試したURL:\n' + result.errors.join('\n');
+        console.error('[manifest] failed', result.errors);
+        return;
+      }
       try{
-        const res = await fetch(DATA_URL, {cache:'no-store'});
-        if(!res.ok) throw new Error('マニフェストを読み込めませんでした');
-        const raw = await res.json();
-        cards = raw.filter(r => r.id);
-        if(!cards.length) throw new Error('カードがありません');
+        const raw = Array.isArray(result.json) ? result.json : [];
+        cards = raw.filter(r => r && r.id);
+        if(!cards.length){
+          setError('カードがありません（JSONの中身が空の可能性）');
+          errEl.textContent = `読み込んだURL: ${result.url}`;
+          return;
+        }
         order = shuffle([...cards.keys()]);
         idx = 0;
+        errEl.textContent = ''; // エラー消去
         render();
-      }catch(err){
-        document.getElementById('title').textContent = '読み込みエラー';
-        document.getElementById('reading').textContent = err.message;
+      }catch(e){
+        setError('JSONの解析に失敗しました');
+        errEl.textContent = `URL: ${result.url}\nError: ${e.message}`;
+        console.error(e);
       }
     }
 
