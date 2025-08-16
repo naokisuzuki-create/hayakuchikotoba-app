@@ -3,25 +3,67 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>早口言葉アプリ（番号対応版）</title>
+  <title>カミカミ★パラダイス 舌こんがらがり選手権</title>
   <style>
-    :root{ --bg:#fff8ef; --ink:#1f1e1c; --muted:#6b6a68; --card:#ffffff; --accent:#4f8cff; }
+    :root{ --bg:#fff8ef; --ink:#1f1e1c; --muted:#6b6a68; --card:#ffffff; --accent:#ff5db1; }
     html,body{height:100%;}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",sans-serif;}
     .app{min-height:100%;display:grid;grid-template-rows:auto 1fr auto;}
     .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 16px;}
     .brand{font-weight:800;letter-spacing:.02em;}
-    .card{margin:0 12px 12px;background:var(--card);border-radius:20px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:grid;grid-template-rows:auto auto 1fr auto;min-height:calc(100vh - 120px);}
+
+    /* 画面切替共通 */
+    .screen{display:none;min-height:calc(100vh - 60px);}  /* 60px ≒ topbar */
+    .screen.active{display:grid;place-items:center;}
+
+    /* タイトル画面（背景は必要なら差し替えOK） */
+    .title-screen{
+      text-align:center;
+      padding:24px;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #ffe6f5 0%, transparent 60%),
+        radial-gradient(900px 500px at 120% 30%, #fff1cc 0%, transparent 60%),
+        radial-gradient(900px 600px at -20% 70%, #e6f7ff 0%, transparent 60%);
+    }
+    .title-block{display:grid;gap:10px;justify-items:center;}
+    .title-main{font-weight:900;letter-spacing:.02em;font-size:clamp(28px, 6.2vw, 56px);}
+    .title-sub{font-weight:800;opacity:.9;font-size:clamp(18px, 3.8vw, 28px);}
+    .start-btn{
+      margin-top:18px;appearance:none;border:0;border-radius:16px;
+      padding:14px 22px;font-size:18px;font-weight:900;cursor:pointer;
+      background:var(--accent);color:#fff;box-shadow:0 8px 18px rgba(0,0,0,.12);
+    }
+
+    /* カウントダウン画面 */
+    .countdown-wrap{
+      display:grid;place-items:center;inline-size:100%;block-size:100%;
+      background:rgba(0,0,0,.35);
+    }
+    .count{
+      font-weight:900;color:#fff;
+      font-size:clamp(48px, 12vw, 120px);
+      text-shadow:0 8px 28px rgba(0,0,0,.55);
+      animation:pulse .8s ease both;
+    }
+    @keyframes pulse{0%{transform:scale(.6);opacity:.6}70%{transform:scale(1.05);opacity:1}100%{transform:scale(1);opacity:1}}
+
+    /* ゲーム画面 */
+    .card{
+      margin:0 12px 12px;background:var(--card);border-radius:20px;
+      box-shadow:0 8px 24px rgba(0,0,0,.08);
+      display:grid;grid-template-rows:auto auto 1fr auto;
+      min-height:calc(100vh - 120px);
+    }
     .text{padding:8px 16px 0;text-align:center;}
-    .title{font-weight:800;line-height:1.25;font-size:clamp(20px, 4.2vw, 40px);}
-    .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px, 3.6vw, 28px);}
+    .reading{margin-bottom:6px;color:var(--muted);font-size:clamp(16px,3.6vw,28px);}
+    .title{font-weight:800;line-height:1.25;font-size:clamp(20px,4.2vw,40px);}
     .stage{display:grid;place-items:center;padding:8px 8px 0;}
     .imgwrap{width:100%;height:100%;display:grid;place-items:center;padding:8px;}
     img.art{max-width:100%;max-height:60vh;object-fit:contain;border-radius:16px;}
     .meta{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 16px;}
-    .stars{font-size:clamp(18px, 4vw, 32px);}
+    .stars{font-size:clamp(18px,4vw,32px);}
     .controls{display:flex;gap:10px;align-items:center;justify-content:center;padding:12px 16px 20px;}
-    button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);}
+    button{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:700;cursor:pointer;background:#1f1e1c;color:#fff;box-shadow:0 6px 16px rgba(0,0,0,.15);}
     button.secondary{background:#e9e7e2;color:#222;}
     .tap{color:var(--muted);font-size:14px;text-align:center;margin-top:-6px;margin-bottom:6px;}
     .err{color:#c00;font-size:14px;margin-top:8px;white-space:pre-wrap}
@@ -30,45 +72,63 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand">早口言葉アプリ（番号対応版）</div>
+      <div class="brand">カミカミ★パラダイス</div>
       <div id="count" aria-live="polite" style="color:var(--muted);"></div>
     </header>
 
-    <main class="card" id="card">
-      <div class="text">
-        <div class="reading" id="reading"></div>
-        <div class="title" id="title">読み込み中…</div>
-        <div class="err" id="err"></div>
+    <!-- タイトル画面 -->
+    <section id="titleScreen" class="screen title-screen active">
+      <div class="title-block">
+        <div class="title-main">カミカミ★パラダイス</div>
+        <div class="title-sub">舌こんがらがり選手権</div>
+        <button id="startBtn" class="start-btn" title="はじめる">はじめる</button>
       </div>
-      <div class="stage" id="stage" title="画面タップでも次へ進めます">
-        <div class="imgwrap">
-          <img class="art" id="art" alt="イラスト" decoding="async" />
-        </div>
-      </div>
-      <div class="meta">
-        <div class="stars" id="stars" aria-label="難易度"></div>
-        <div class="tap">（タップでも次へ）</div>
-      </div>
-    </main>
+    </section>
 
-    <footer class="controls">
-      <button id="prev" class="secondary" title="ひとつ前">← もどる</button>
-      <button id="next" title="次のカード">次へ →</button>
-    </footer>
+    <!-- カウントダウン画面 -->
+    <section id="countdownScreen" class="screen" aria-live="polite">
+      <div class="countdown-wrap">
+        <div id="countNum" class="count">3</div>
+      </div>
+    </section>
+
+    <!-- ゲーム画面 -->
+    <main id="gameScreen" class="screen">
+      <section class="card" id="card" title="画面タップでも次へ進めます">
+        <div class="text">
+          <div class="reading" id="reading"></div>
+          <div class="title" id="title">読み込み中…</div>
+          <div class="err" id="err"></div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="imgwrap">
+            <img class="art" id="art" alt="イラスト" decoding="async" />
+          </div>
+        </div>
+        <div class="meta">
+          <div class="stars" id="stars" aria-label="難易度"></div>
+          <div class="tap">（タップでも次へ）</div>
+        </div>
+      </section>
+
+      <footer class="controls">
+        <button id="prev" class="secondary" title="ひとつ前">← もどる</button>
+        <button id="next" title="次のカード">次へ →</button>
+      </footer>
+    </main>
   </div>
 
   <script>
-    // 最優先の想定パス
+    // ====== 設定 ======
     const PRIMARY_DATA = "data/hayakuchikotoba_manifest.json";
     const IMG_BASE = "images/";
-
-    // 代替候補（プロジェクト直下に置いた場合など）
     const DATA_CANDIDATES = [
       PRIMARY_DATA,
       "./hayakuchikotoba_manifest.json",
       "./data/hayakuchikotoba_manifest.json",
     ];
 
+    // ====== 要素参照 ======
     const readingEl = document.getElementById('reading');
     const titleEl   = document.getElementById('title');
     const starsEl   = document.getElementById('stars');
@@ -76,62 +136,77 @@
     const artEl     = document.getElementById('art');
     const errEl     = document.getElementById('err');
 
-    let cards = [];
-    let order = [];
-    let idx = 0;
+    // ====== 状態 ======
+    let cards = [];      // { id, title, reading, difficulty }
+    let order = [];      // シャッフル済みインデックス
+    let idx = 0;         // 現在位置
 
-    function shuffle(arr){
+    // ====== ユーティリティ ======
+    const wait = (ms)=>new Promise(r=>setTimeout(r,ms));
+    const shuffle = (arr)=>{
       const a = arr.slice();
       for(let i=a.length-1;i>0;i--){
         const j = Math.floor(Math.random()*(i+1));
         [a[i],a[j]]=[a[j],a[i]];
       }
       return a;
-    }
-
-    function setError(msg){
+    };
+    const setError = (msg)=>{
       titleEl.textContent = '読み込みエラー';
       readingEl.textContent = msg || '';
+    };
+
+    // ====== 画面切替 ======
+    function show(screenId){
+      ['titleScreen','countdownScreen','gameScreen'].forEach(id=>{
+        document.getElementById(id).classList.remove('active');
+      });
+      document.getElementById(screenId).classList.add('active');
     }
 
+    // ====== 描画 ======
     function render(){
       if(!cards.length) return;
       const item = cards[order[idx]];
 
-      // 文字と画像を同じタイミングで更新
+      // テキスト → 即表示
       readingEl.textContent = item.reading || '';
-      titleEl.textContent   = item.title || '';
+      titleEl.textContent   = item.title   || '';
       starsEl.textContent   = item.difficulty || '';
       countEl.textContent   = `${idx+1} / ${cards.length}`;
 
+      // 画像
       const src = IMG_BASE + item.id + ".png";
       artEl.alt = item.title || "イラスト";
-      artEl.src = src;
+      artEl.src = encodeURI(src);
 
-      // 次の画像を先読み
+      // 先読み
       const nextItem = cards[order[(idx + 1) % order.length]];
       if(nextItem){
         const preload = new Image();
-        preload.src = IMG_BASE + nextItem.id + ".png";
+        preload.src = encodeURI(IMG_BASE + nextItem.id + ".png");
       }
     }
 
+    // ====== ナビゲーション ======
     function next(){ idx = (idx + 1) % order.length; render(); }
     function prev(){ idx = (idx - 1 + order.length) % order.length; render(); }
     function onKey(e){
+      const isGame = document.getElementById('gameScreen').classList.contains('active');
+      if(!isGame) return;
       if(e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' '){ next(); }
       if(e.key === 'ArrowLeft'){ prev(); }
     }
 
+    // ====== マニフェスト取得 ======
     async function fetchFirstOk(urls){
       const errors = [];
       for(const u of urls){
-        const url = u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now();
+        const url = u + (u.includes('?') ? '&' : '?') + 'v=' + Date.now(); // キャッシュ破り
         try{
           const res = await fetch(url, {cache:'no-store'});
           if(res.ok){
-            const json = await res.json();
-            return { ok:true, json, url:u, status:res.status };
+            return { ok:true, json: await res.json(), url:u, status:res.status };
           }else{
             errors.push(`${u} → HTTP ${res.status}`);
           }
@@ -146,7 +221,7 @@
       const result = await fetchFirstOk(DATA_CANDIDATES);
       if(!result.ok){
         setError('マニフェストを読み込めませんでした');
-        errEl.textContent = '試したURL:\n' + result.errors.join('\n');
+        errEl.textContent = '試したURL:\\n' + result.errors.join('\\n');
         console.error('[manifest] failed', result.errors);
         return;
       }
@@ -160,20 +235,39 @@
         }
         order = shuffle([...cards.keys()]);
         idx = 0;
-        errEl.textContent = ''; // エラー消去
-        render();
+        errEl.textContent = '';
+        // タイトル画面のうちに読み込み完了しておく
       }catch(e){
         setError('JSONの解析に失敗しました');
-        errEl.textContent = `URL: ${result.url}\nError: ${e.message}`;
+        errEl.textContent = `URL: ${result.url}\\nError: ${e.message}`;
         console.error(e);
       }
     }
 
+    // ====== カウントダウン ======
+    async function startCountdown(){
+      show('countdownScreen');
+      const nums = ['3','2','1'];
+      for(const n of nums){
+        const el = document.getElementById('countNum');
+        el.textContent = n;
+        el.style.animation = 'none';
+        void el.offsetWidth;                 // reflow でアニメ再起動
+        el.style.animation = 'pulse .8s ease both';
+        await wait(900);
+      }
+      show('gameScreen');
+      render();
+    }
+
+    // ====== イベント ======
+    document.getElementById('startBtn').addEventListener('click', startCountdown);
     document.getElementById('next').addEventListener('click', next);
     document.getElementById('prev').addEventListener('click', prev);
     document.getElementById('card').addEventListener('click', next);
     window.addEventListener('keydown', onKey);
 
+    // 起動：データだけ先にロード
     boot();
   </script>
 </body>
